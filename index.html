@@ -196,6 +196,8 @@
   .badge-other  { background: #f3f4f6; color: #374151; }
   .badge-shot   { background: #d1fae5; color: #047857; }
   .badge-unshot { background: #f3f4f6; color: #6b7280; }
+  .badge-posted   { background: #dbeafe; color: #1d4ed8; }
+  .badge-unposted { background: #f3f4f6; color: #6b7280; }
   .status-btn {
     padding: 3px 10px;
     border-radius: 12px;
@@ -490,6 +492,11 @@
       <button class="tab-btn" data-status="unshot" onclick="setStatus(this, 'unshot')">📷 未撮影</button>
       <button class="tab-btn" data-status="shot" onclick="setStatus(this, 'shot')">✅ 撮影済み</button>
     </div>
+    <div class="category-tabs" id="postingTabs">
+      <button class="tab-btn active" data-posting="" onclick="setPosting(this, '')">🗂 全投稿</button>
+      <button class="tab-btn" data-posting="unposted" onclick="setPosting(this, 'unposted')">📝 未投稿</button>
+      <button class="tab-btn" data-posting="posted" onclick="setPosting(this, 'posted')">📤 投稿済み</button>
+    </div>
   </div>
 
   <div class="result-count" id="resultCount"></div>
@@ -563,6 +570,15 @@
         <label>台本内容<span class="required">*</span></label>
         <textarea id="eContent" placeholder="台本の内容を入力..." rows="10"></textarea>
       </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>投稿状態</label>
+          <select id="ePostingStatus">
+            <option value="unposted">📝 未投稿</option>
+            <option value="posted">📤 投稿済み</option>
+          </select>
+        </div>
+      </div>
       <div class="form-group">
         <label>備考・進捗メモ</label>
         <textarea id="eNotes" placeholder="撮影予定・修正履歴など" rows="4"></textarea>
@@ -622,6 +638,13 @@
             <option value="shot">✅ 撮影済み</option>
           </select>
         </div>
+        <div class="form-group">
+          <label>投稿状態</label>
+          <select id="fPostingStatus">
+            <option value="unposted">📝 未投稿</option>
+            <option value="posted">📤 投稿済み</option>
+          </select>
+        </div>
       </div>
       <div class="form-group">
         <label>台本本文<span class="required">*</span></label>
@@ -675,6 +698,7 @@ const CATEGORY_LABELS = {
 let allScripts = [];
 let currentFilter = '';
 let currentStatusFilter = '';
+let currentPostingFilter = '';
 let currentScript = null;
 
 async function loadScripts() {
@@ -693,7 +717,8 @@ function getFiltered() {
   return allScripts.filter(s => {
     const catOk = !currentFilter || s.category === currentFilter;
     const statusOk = !currentStatusFilter || (s.shooting_status || 'unshot') === currentStatusFilter;
-    if (!catOk || !statusOk) return false;
+    const postingOk = !currentPostingFilter || (s.posting_status || 'unposted') === currentPostingFilter;
+    if (!catOk || !statusOk || !postingOk) return false;
     if (!q) return true;
     return (
       s.title.toLowerCase().includes(q) ||
@@ -714,8 +739,15 @@ function setStatus(btn, status) {
 
 function filterScripts() { renderCards(getFiltered()); }
 
+function setPosting(btn, posting) {
+  document.querySelectorAll('#postingTabs .tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentPostingFilter = posting;
+  filterScripts();
+}
+
 function setCategory(btn, cat) {
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#categoryTabs .tab-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   currentFilter = cat;
   filterScripts();
@@ -756,6 +788,10 @@ function renderCards(scripts) {
     const statusLabel = isShot ? '✅ 撮影済み' : '📷 未撮影';
     const statusClass = isShot ? 'badge-shot' : 'badge-unshot';
     const nextStatus = isShot ? 'unshot' : 'shot';
+    const isPosted = (s.posting_status || 'unposted') === 'posted';
+    const postingLabel = isPosted ? '📤 投稿済み' : '📝 未投稿';
+    const postingClass = isPosted ? 'badge-posted' : 'badge-unposted';
+    const nextPosting = isPosted ? 'unposted' : 'posted';
     return `
     <div class="script-card" onclick="openDetail(${s.id ? `'${s.id}'` : 'null'})">
       <div class="card-header">
@@ -765,6 +801,7 @@ function renderCards(scripts) {
       <div class="card-meta">
         ${tags}
         <button class="status-btn badge ${statusClass}" onclick="event.stopPropagation(); toggleStatus('${s.id}', '${nextStatus}')">${statusLabel}</button>
+        <button class="status-btn badge ${postingClass}" onclick="event.stopPropagation(); togglePosting('${s.id}', '${nextPosting}')">${postingLabel}</button>
       </div>
       <div class="card-preview">${escHtml(preview)}${s.content && s.content.length > 120 ? '…' : ''}</div>
       <div class="card-footer">
@@ -799,11 +836,15 @@ function openDetail(id) {
   const isShot = (s.shooting_status || 'unshot') === 'shot';
   const statusLabel = isShot ? '✅ 撮影済み' : '📷 未撮影';
   const nextStatus = isShot ? 'unshot' : 'shot';
+  const isPosted = (s.posting_status || 'unposted') === 'posted';
+  const postingLabel = isPosted ? '📤 投稿済み' : '📝 未投稿';
+  const nextPosting = isPosted ? 'unposted' : 'posted';
 
   let infoHtml = `<dt>登録日</dt><dd>${formatDate(s.created_at)}</dd>`;
   if (s.product) infoHtml += `<dt>案件名</dt><dd>${escHtml(s.product)}</dd>`;
   if (s.duration_sec) infoHtml += `<dt>想定時間</dt><dd>${formatDuration(s.duration_sec)}</dd>`;
   infoHtml += `<dt>撮影状態</dt><dd><button class="status-btn badge ${isShot ? 'badge-shot' : 'badge-unshot'}" onclick="event.stopPropagation(); toggleStatus('${s.id}', '${nextStatus}'); openDetail('${s.id}')">${statusLabel}</button></dd>`;
+  infoHtml += `<dt>投稿状態</dt><dd><button class="status-btn badge ${isPosted ? 'badge-posted' : 'badge-unposted'}" onclick="event.stopPropagation(); togglePosting('${s.id}', '${nextPosting}'); openDetail('${s.id}')">${postingLabel}</button></dd>`;
   document.getElementById('detailInfo').innerHTML = infoHtml;
   if (!s.product && !s.duration_sec) document.getElementById('detailInfo').style.display = 'none';
   else document.getElementById('detailInfo').style.display = '';
@@ -859,6 +900,21 @@ async function toggleStatus(id, newStatus) {
   }
 }
 
+async function togglePosting(id, newStatus) {
+  try {
+    await sbFetch(`scripts?id=eq.${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ posting_status: newStatus })
+    });
+    const s = allScripts.find(x => x.id === id);
+    if (s) s.posting_status = newStatus;
+    renderCards(getFiltered());
+    showToast(newStatus === 'posted' ? '📤 投稿済みにしました！' : '📝 未投稿に戻しました');
+  } catch(e) {
+    showToast('更新に失敗しました: ' + e.message);
+  }
+}
+
 function openEditModal() {
   if (!currentScript) return;
   const s = currentScript;
@@ -870,6 +926,7 @@ function openEditModal() {
   document.getElementById('eDuration').value = s.duration_sec || '';
   document.getElementById('eContent').value = s.content || '';
   document.getElementById('eNotes').value = s.notes || '';
+  document.getElementById('ePostingStatus').value = s.posting_status || 'unposted';
 
   document.getElementById('detailModal').classList.remove('open');
   document.getElementById('editModal').classList.add('open');
@@ -895,6 +952,7 @@ async function saveEditedScript() {
     content,
     notes: document.getElementById('eNotes').value.trim() || null,
     duration_sec: duration,
+    posting_status: document.getElementById('ePostingStatus').value,
   };
 
   const btn = event.target;
@@ -956,6 +1014,7 @@ async function saveScript() {
     notes: document.getElementById('fNotes').value.trim() || null,
     duration_sec: duration,
     shooting_status: document.getElementById('fShootingStatus').value,
+    posting_status: document.getElementById('fPostingStatus').value,
   };
 
   const btn = document.getElementById('btnSave');
